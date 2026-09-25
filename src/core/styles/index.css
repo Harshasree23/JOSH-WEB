@@ -1,0 +1,7 @@
+@import "tailwindcss";
+
+@theme {
+  --font-caveat: "Caveat", cursive;
+  --font-kalam: "Kalam", cursive;
+  --font-bubbler: "Bubbler One", sans-serif;
+}
