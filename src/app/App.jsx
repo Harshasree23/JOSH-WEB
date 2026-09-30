@@ -6,6 +6,7 @@ import { JournalPage } from '../features/journal'
 import { LeaderboardPage } from '../features/leaderboard'
 import { HabitsPage } from '../features/habits'
 import { SettingsPage } from '../features/settings'
+import { BoardPage } from '../features/board'
 
 export default function App() {
   return (
@@ -16,6 +17,7 @@ export default function App() {
             <Route index element={<DashboardPage />} />
             <Route path="journal" element={<JournalPage />} />
             <Route path="leaderboard" element={<LeaderboardPage />} />
+            <Route path="board" element={<BoardPage />} />
             <Route path="habits" element={<HabitsPage />} />
             <Route path="settings" element={<SettingsPage />} />
           </Route>

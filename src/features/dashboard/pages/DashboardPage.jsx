@@ -7,10 +7,17 @@ export default function DashboardPage()
     <div>
 
 
-      <Profile />
-
+      <div className="flex items-center justify-between">
+        
+        <Profile />
+       
+        <div>
+          Quotation here
+        </div>
+      </div>
+      
+      
       <Heading title="Streak" />
-
       <StreakGraph />
 
 

@@ -4,7 +4,7 @@ import { useAuthStore } from '../features/auth/stores/authStore'
 const navItems = [
   { to: '/', label: 'Dashboard' },
   { to: '/journal', label: 'Journal' },
-  { to: '/leaderboard', label: 'Board' },
+  { to: '/board', label: 'Board' },
   { to: '/habits', label: 'Habits' },
   { to: '/settings', label: 'Settings' },
 ]
