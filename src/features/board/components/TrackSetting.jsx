@@ -27,7 +27,7 @@ const TrackSetting = ({setDragStart, setCurrentDrag, setBoardData, dragStart, cu
     }
 
     return(
-        <div className="absolute w-screen h-screen top-0 left-0 z-50 backdrop-blur-sm flex items-center" >
+        <div className="fixed inset-0 w-screen h-screen z-50 backdrop-blur-sm flex items-center" >
             <form className="bg-white p-20 mx-auto w-fit" onSubmit={handleSubmit}>
                 <div>
                     <input type="text" name="eventName"  placeholder="name of the event" />

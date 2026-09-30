@@ -55,7 +55,7 @@ const TrackRow = ({boardData, setBoardData}) => {
 
             {/* Existing events */}
             {
-                boardData.sort((a,b) => a.start - b.start).map(
+                [...boardData].sort((a,b) => a.start - b.start).map(
                     (event,index) => {
                         return(
                             <div key={index} className="relative w-full bg-gray-200 h-8" >

@@ -7,7 +7,7 @@ const TimelineIndicator = ( ) => {
             {
                 Array.from({length:24}, (_,index) => {
                     return(
-                        <div key={index} className="flex-1 text-xs font-gray-200">
+                        <div key={index} className="flex-1 text-xs text-gray-400">
                             {index + ":00"}
                         </div>
                     );

@@ -20,7 +20,7 @@ const BoardPage = () => {
 
             {/* Date */}
             <div className="mb-5 font-semibold font-caveat text-2xl text-right">
-                { date.getDate() + "-" + date.getMonth() + "-" + date.getFullYear() }
+                { date.getDate() + "-" + ( date.getMonth()+1 ) + "-" + date.getFullYear() }
             </div>
             
             {/* Timeline indicator */}
