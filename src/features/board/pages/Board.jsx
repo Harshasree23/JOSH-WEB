@@ -1,19 +1,16 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import TimelineIndicator from "../components/TimelineIndicator";
 import TrackRow from "../components/TrackRow";
+import { useBoardStore } from "../stores/boardStore";
 
 const BoardPage = () => {
 
     const date = new Date();
+    const { events, loading, fetchEvents } = useBoardStore();
 
-    const [boardData,setBoardData] = useState([
-        {
-            start: 30,
-            end: 400,
-            name: "Bull Shit",
-            description: "Dog Shit",
-        }
-    ]);
+    useEffect(() => {
+        fetchEvents(date);
+    }, [fetchEvents]);
 
     return(
         <div className="">
@@ -27,7 +24,7 @@ const BoardPage = () => {
             <TimelineIndicator />
             
             {/* Event tracks */}
-            <TrackRow boardData={boardData} setBoardData={setBoardData} />
+            <TrackRow events={events} date={date} />
         </div>
     );
 };

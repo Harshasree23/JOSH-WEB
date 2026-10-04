@@ -1,11 +1,6 @@
 -- ============================================================================
--- PILLAR HABIT OS — Complete Database Schema
--- ============================================================================
--- All 9 tables, RLS policies, triggers, scoring function, and seed data.
--- Run this migration in your Supabase SQL Editor or via Supabase CLI.
--- ============================================================================
-
 -- 4.1 Profiles
+-- ============================================================================
 create table public.profiles (
   id uuid references auth.users(id) on delete cascade primary key,
   username text unique not null,
@@ -22,16 +17,6 @@ create policy "own profile write" on public.profiles
 create policy "own profile update" on public.profiles
   for update using (auth.uid() = id) with check (auth.uid() = id);
 
--- Allow reading profiles of group members (for leaderboard display names/avatars)
-create policy "group member profiles" on public.profiles
-  for select using (
-    id in (
-      select gm2.user_id from public.group_members gm1
-      join public.group_members gm2 on gm1.group_id = gm2.group_id
-      where gm1.user_id = auth.uid()
-    )
-  );
-
 -- ============================================================================
 -- 4.2 Categories (system-seeded, fixed set)
 -- ============================================================================
@@ -44,12 +29,10 @@ create table public.categories (
   sort_order int not null
 );
 
--- Categories are readable by all authenticated users (system data)
 alter table public.categories enable row level security;
 create policy "categories are public" on public.categories
   for select using (true);
 
--- Seed the 5 fixed categories
 insert into public.categories (slug, display_name, icon, color_hex, sort_order) values
   ('health',        'Health',        '💪', '#10B981', 1),
   ('mind',          'Mind',          '🧠', '#8B5CF6', 2),
@@ -154,6 +137,7 @@ create policy "own journal links" on public.journal_habit_links
 -- ============================================================================
 -- 4.8 Groups & Membership
 -- ============================================================================
+-- 1. Create tables FIRST
 create table public.groups (
   id uuid primary key default gen_random_uuid(),
   name text not null,
@@ -161,6 +145,14 @@ create table public.groups (
   created_at timestamptz default now()
 );
 
+create table public.group_members (
+  group_id uuid references public.groups(id) on delete cascade,
+  user_id uuid references public.profiles(id) on delete cascade,
+  joined_at timestamptz default now(),
+  primary key (group_id, user_id)
+);
+
+-- 2. Apply Policies AFTER both tables exist
 alter table public.groups enable row level security;
 create policy "group members can read" on public.groups
   for select using (
@@ -171,13 +163,6 @@ create policy "anyone can create group" on public.groups
 create policy "owner can update group" on public.groups
   for update using (auth.uid() = owner_id);
 
-create table public.group_members (
-  group_id uuid references public.groups(id) on delete cascade,
-  user_id uuid references public.profiles(id) on delete cascade,
-  joined_at timestamptz default now(),
-  primary key (group_id, user_id)
-);
-
 alter table public.group_members enable row level security;
 create policy "members can read membership" on public.group_members
   for select using (
@@ -187,6 +172,16 @@ create policy "can join groups" on public.group_members
   for insert with check (auth.uid() = user_id);
 create policy "can leave groups" on public.group_members
   for delete using (auth.uid() = user_id);
+
+-- 3. Now apply the cross-table profile policy
+create policy "group member profiles" on public.profiles
+  for select using (
+    id in (
+      select gm2.user_id from public.group_members gm1
+      join public.group_members gm2 on gm1.group_id = gm2.group_id
+      where gm1.user_id = auth.uid()
+    )
+  );
 
 -- ============================================================================
 -- 4.9 Precomputed Daily Scores
@@ -211,9 +206,27 @@ create policy "group-visible scores" on public.daily_scores
       where gm1.user_id = auth.uid()
     )
   );
--- Users can also always read their own scores
 create policy "own scores" on public.daily_scores
   for select using (auth.uid() = user_id);
+
+-- ============================================================================
+-- 4.10 Board Events (daily activity / time-block scheduler)
+-- ============================================================================
+create table public.board_events (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references public.profiles(id) on delete cascade not null,
+  event_date date not null,
+  name text not null,
+  description text,
+  start_px int not null,         
+  end_px int not null,           
+  color text default '#4B5563',  
+  created_at timestamptz default now()
+);
+
+alter table public.board_events enable row level security;
+create policy "own board events" on public.board_events
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
 -- ============================================================================
 -- TRIGGER: Maintain habit_streaks on habit_log changes
@@ -225,17 +238,13 @@ declare
   v_streak int;
   v_longest int;
 begin
-  -- Only process completed logs
   if NEW.completed = false then
-    -- If uncompleting, recalculate from scratch
     select last_completed_date, current_streak, longest_streak
     into v_prev_date, v_streak, v_longest
     from public.habit_streaks
     where habit_id = NEW.habit_id;
 
     if v_prev_date = NEW.log_date then
-      -- Need to recalculate streak
-      -- Find the previous consecutive completed date
       with consecutive_dates as (
         select log_date,
                log_date - (row_number() over (order by log_date desc))::int as grp
@@ -255,34 +264,27 @@ begin
           last_completed_date = v_prev_date
       where habit_id = NEW.habit_id;
     end if;
-
     return NEW;
   end if;
 
-  -- Get existing streak data
   select last_completed_date, current_streak, longest_streak
   into v_prev_date, v_streak, v_longest
   from public.habit_streaks
   where habit_id = NEW.habit_id;
 
   if not found then
-    -- First ever log for this habit
     insert into public.habit_streaks (habit_id, user_id, current_streak, longest_streak, last_completed_date)
     values (NEW.habit_id, NEW.user_id, 1, 1, NEW.log_date);
     return NEW;
   end if;
 
   if NEW.log_date = v_prev_date then
-    -- Same day re-log, no change
     return NEW;
   elsif NEW.log_date = v_prev_date + 1 then
-    -- Consecutive day — extend streak
     v_streak := v_streak + 1;
   elsif NEW.log_date > coalesce(v_prev_date, '1970-01-01'::date) then
-    -- Gap — reset streak
     v_streak := 1;
   else
-    -- Backdated log, don't modify current streak
     return NEW;
   end if;
 
@@ -305,17 +307,14 @@ create trigger trg_update_streak
   for each row execute function public.update_habit_streak();
 
 -- ============================================================================
--- TRIGGER: Category Coverage Enforcement (Section 7)
--- Prevents archiving/deactivating the last active habit in a category
+-- TRIGGER: Category Coverage Enforcement
 -- ============================================================================
 create or replace function public.enforce_category_coverage()
 returns trigger as $$
 declare
   v_active_count int;
 begin
-  -- Only check when a habit is being deactivated or deleted
   if TG_OP = 'UPDATE' then
-    -- Only fire when is_active changes from true to false
     if OLD.is_active = true and NEW.is_active = false then
       select count(*) into v_active_count
       from public.habits
@@ -329,7 +328,6 @@ begin
       end if;
     end if;
   elsif TG_OP = 'DELETE' then
-    -- Check if this would leave the category empty
     if OLD.is_active = true then
       select count(*) into v_active_count
       from public.habits
@@ -356,7 +354,7 @@ create trigger trg_category_coverage
   for each row execute function public.enforce_category_coverage();
 
 -- ============================================================================
--- FUNCTION: compute_daily_score (Section 5 — exact formula)
+-- FUNCTION: compute_daily_score
 -- ============================================================================
 create or replace function public.compute_daily_score(p_user_id uuid, p_date date)
 returns void as $$
@@ -372,13 +370,11 @@ declare
   v_base numeric;
   v_total numeric;
 begin
-  -- 5.1 Completion Score
   select count(*) into v_total_active
   from public.habits
   where user_id = p_user_id and is_active = true;
 
   if v_total_active = 0 then
-    -- No active habits, nothing to score
     return;
   end if;
 
@@ -391,7 +387,6 @@ begin
   v_completion_rate := v_completed::numeric / v_total_active::numeric;
   v_completion_score := v_completion_rate * 100;
 
-  -- 5.2 Streak Score (sqrt diminishing returns)
   select coalesce(avg(
     least(sqrt(greatest(hs.current_streak, 0)) * 10, 100)
   ), 0)
@@ -401,7 +396,6 @@ begin
   where hs.user_id = p_user_id
     and h.is_active = true;
 
-  -- 5.3 Limit-Reached Multiplier (quantifiable habits only)
   select coalesce(avg(
     greatest(0, (hl.actual_value - h.baseline_target) / nullif(h.baseline_target, 0))
   ), 0)
@@ -415,7 +409,6 @@ begin
     and h.baseline_target is not null
     and h.baseline_target > 0;
 
-  -- If no quantifiable habits, multiplier = 1
   if v_avg_overage is null or not exists (
     select 1 from public.habits
     where user_id = p_user_id and is_active = true and is_quantifiable = true
@@ -425,11 +418,9 @@ begin
     v_limit_multiplier := 1 + least(v_avg_overage, 0.5);
   end if;
 
-  -- 5.4 Combined Total
   v_base := (v_completion_score * 0.6) + (v_streak_score * 0.4);
   v_total := v_base * v_limit_multiplier;
 
-  -- Upsert into daily_scores — store all 4 components
   insert into public.daily_scores (user_id, score_date, completion_score, streak_score, limit_multiplier, total_score)
   values (p_user_id, p_date, v_completion_score, v_streak_score, v_limit_multiplier, v_total)
   on conflict (user_id, score_date) do update set
@@ -458,17 +449,3 @@ $$ language plpgsql security definer;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_user();
-
--- ============================================================================
--- pg_cron setup (run in Supabase dashboard under Database > Extensions)
--- Enable pg_cron extension first, then schedule:
---
--- select cron.schedule(
---   'nightly-score-computation',
---   '0 2 * * *',  -- 2 AM UTC daily
---   $$
---     select public.compute_daily_score(p.id, current_date - 1)
---     from public.profiles p;
---   $$
--- );
--- ============================================================================

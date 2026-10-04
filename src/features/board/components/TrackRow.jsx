@@ -3,7 +3,7 @@ import TrackDraft from "./TrackDraft";
 import TrackEvent from "./TrackEvent";
 import TrackSetting from "./TrackSetting";
 
-const TrackRow = ({boardData, setBoardData}) => {
+const TrackRow = ({ events, date }) => {
 
     const [dragStart, setDragStart] = useState(null);
     const [currentDrag, setCurrentDrag] = useState(null);
@@ -46,22 +46,23 @@ const TrackRow = ({boardData, setBoardData}) => {
                 <TrackSetting 
                     setDragStart={setDragStart} 
                     setCurrentDrag={setCurrentDrag} 
-                    setBoardData={setBoardData} 
                     dragStart={dragStart} 
                     currentDrag={currentDrag}
+                    date={date}
                     closeModal={() => setAddEvent(false)} 
                 />
             }
 
             {/* Existing events */}
             {
-                [...boardData].sort((a,b) => a.start - b.start).map(
-                    (event,index) => {
+                [...events].sort((a,b) => a.start_px - b.start_px).map(
+                    (event) => {
                         return(
-                            <div key={index} className="relative w-full bg-gray-200 h-8" >
+                            <div key={event.id} className="relative w-full bg-gray-200 h-8" >
                                 <TrackEvent 
-                                    start={event.start} 
-                                    end={event.end} 
+                                    id={event.id}
+                                    start={event.start_px} 
+                                    end={event.end_px} 
                                     name={event.name} 
                                     description={event.description} />
                             </div>

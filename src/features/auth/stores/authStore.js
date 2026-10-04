@@ -43,10 +43,10 @@ export const useAuthStore = create((set, get) => ({
       // Profile doesn't exist yet — the DB trigger should create it,
       // but if not, we create it manually
       const user = get().user
-      const username = user?.user_metadata?.username ||
+      let username = user?.user_metadata?.username ||
         user?.email?.split('@')[0] || 'user'
 
-      const { data: newProfile } = await supabase
+      const { data: newProfile, error: upsertError } = await supabase
         .from('profiles')
         .upsert({
           id: userId,
@@ -56,7 +56,24 @@ export const useAuthStore = create((set, get) => ({
         .select()
         .single()
 
-      set({ profile: newProfile })
+      if (upsertError) {
+        // Username conflict — retry with a unique suffix
+        console.warn('Profile upsert failed, retrying with unique username:', upsertError.message)
+        const suffix = Date.now().toString(36).slice(-4)
+        const { data: retryProfile } = await supabase
+          .from('profiles')
+          .upsert({
+            id: userId,
+            username: `${username}_${suffix}`,
+            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          })
+          .select()
+          .single()
+
+        set({ profile: retryProfile })
+      } else {
+        set({ profile: newProfile })
+      }
     } else if (data) {
       set({ profile: data })
     }
