@@ -40,7 +40,7 @@ export const useHabitsStore = create((set, get) => ({
       const today = new Date().toISOString().split('T')[0]
       const { data: logsData } = await supabase
         .from('habit_logs')
-        .select('habit_id, completed, actual_value')
+        .select('habit_id, completed, actual_value, completion_log')
         .eq('log_date', today)
 
       const logsMap = {}
@@ -250,6 +250,46 @@ export const useHabitsStore = create((set, get) => ({
         setTimeout(() => get().fetchHabits(), 500)
       }
     }
+  },
+
+  // Save actual_value and/or completion_log for today's log (without toggling completion)
+  saveLog: async (habitId, { actualValue, completionLog }) => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { error: { message: 'Not authenticated' } }
+
+    const today = new Date().toISOString().split('T')[0]
+
+    const updates = {}
+    if (actualValue !== undefined) updates.actual_value = actualValue === '' ? null : Number(actualValue)
+    if (completionLog !== undefined) updates.completion_log = completionLog || null
+
+    const { data, error } = await supabase
+      .from('habit_logs')
+      .upsert(
+        {
+          habit_id: habitId,
+          user_id: user.id,
+          log_date: today,
+          ...updates,
+        },
+        { onConflict: 'habit_id,log_date' }
+      )
+      .select()
+      .single()
+
+    if (error) {
+      console.error('Error saving habit log:', error)
+      return { error }
+    }
+
+    set((state) => ({
+      habits: state.habits.map((h) =>
+        h.id === habitId
+          ? { ...h, todayLog: { ...h.todayLog, ...data } }
+          : h
+      ),
+    }))
+    return { data, error: null }
   },
 
   archiveHabit: async (habitId) => {

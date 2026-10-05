@@ -7,11 +7,13 @@ const TrackEvent = ({id, start, end, name, description}) => {
     const width = Math.abs(end - start);
 
     return(
-        <div className="bg-gray-600 h-8 text-white font-semibold rounded text-sm flex items-center justify-between px-2 font-kalam absolute group"
+        <div className="bg-gray-600 h-8 text-white font-semibold rounded text-xs flex items-center justify-between px-2 font-kalam absolute group"
             style={{
                 left: `${leftPos}px`,
                 width: `${width}px`
-            }} >
+            }} 
+            title={`${name}  ${description !=null ? description : ""}`}
+            >
                 <span className="truncate">{ name }</span>
                 <button
                     onClick={() => deleteEvent(id)}

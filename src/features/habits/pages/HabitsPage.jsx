@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import StreakGraph from "../../../shared/components/StreakGraph"
 import { useHabitsStore } from "../stores/habitsStore"
 
@@ -75,11 +75,36 @@ export default function HabitsPage() {
 
 
 const HabitItem = ({ habit, onEdit }) => {
-  const { toggleHabitLog, deleteHabit } = useHabitsStore()
+  const { toggleHabitLog, deleteHabit, saveLog } = useHabitsStore()
   const isCompleted = habit.todayLog?.completed
   const [expanded, setExpanded] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
+
+  // Log fields — pre-fill from today's log each time it changes
+  const [actualValue, setActualValue] = useState(habit.todayLog?.actual_value ?? '')
+  const [completionLog, setCompletionLog] = useState(habit.todayLog?.completion_log ?? '')
+  const [saving, setSaving] = useState(false)
+
+  // Keep inputs in sync if todayLog changes externally (e.g. after toggle)
+  useEffect(() => {
+    setActualValue(habit.todayLog?.actual_value ?? '')
+    setCompletionLog(habit.todayLog?.completion_log ?? '')
+  }, [habit.todayLog?.actual_value, habit.todayLog?.completion_log])
+
+  const saveTimerRef = useRef(null)
+
+  const scheduleSave = (newActualValue, newCompletionLog) => {
+    clearTimeout(saveTimerRef.current)
+    saveTimerRef.current = setTimeout(async () => {
+      setSaving(true)
+      await saveLog(habit.id, {
+        actualValue: habit.is_quantifiable ? newActualValue : undefined,
+        completionLog: newCompletionLog,
+      })
+      setSaving(false)
+    }, 800)
+  }
 
   const handleDelete = async () => {
     setDeleting(true)
@@ -207,6 +232,51 @@ const HabitItem = ({ habit, onEdit }) => {
           {/* Streak graph */}
           <div>
             <StreakGraph habitId={habit.id} />
+          </div>
+
+          {/* ── Today's Log ── */}
+          <div className="border-t pt-4 flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Today's log</p>
+              {saving && <span className="text-xs text-gray-400">Saving…</span>}
+            </div>
+
+            {/* actual_value — only for quantifiable habits */}
+            {habit.is_quantifiable && (
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">
+                  Actual {habit.unit ? `(${habit.unit})` : 'value'}
+                  <span className="ml-1 text-gray-300">· target: {habit.baseline_target}</span>
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="any"
+                  placeholder={`e.g. ${habit.baseline_target}`}
+                  value={actualValue}
+                  onChange={(e) => {
+                    setActualValue(e.target.value)
+                    scheduleSave(e.target.value, completionLog)
+                  }}
+                  className="w-32 border border-gray-200 rounded-lg px-3 py-1.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition"
+                />
+              </div>
+            )}
+
+            {/* completion_log — reflection text */}
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">How did it feel?</label>
+              <textarea
+                rows={2}
+                placeholder="Write a quick reflection…"
+                value={completionLog}
+                onChange={(e) => {
+                  setCompletionLog(e.target.value)
+                  scheduleSave(actualValue, e.target.value)
+                }}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition resize-none"
+              />
+            </div>
           </div>
         </div>
       )}
