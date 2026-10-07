@@ -51,12 +51,15 @@ export const useHabitsStore = create((set, get) => ({
       }
 
       // Merge everything together
-      const habits = (habitsData || []).map((habit) => ({
-        ...habit,
-        category: habit.categories,
-        streak: habit.habit_streaks?.[0] || { current_streak: 0, longest_streak: 0 },
-        todayLog: logsMap[habit.id] || null,
-      }))
+      const habits = (habitsData || []).map((habit) => {
+        const streakData = Array.isArray(habit.habit_streaks) ? habit.habit_streaks[0] : habit.habit_streaks
+        return {
+          ...habit,
+          category: habit.categories,
+          streak: streakData || { current_streak: 0, longest_streak: 0 },
+          todayLog: logsMap[habit.id] || null,
+        }
+      })
 
       set({ habits, loading: false })
     } catch (error) {
@@ -221,6 +224,8 @@ export const useHabitsStore = create((set, get) => ({
               : h
           ),
         }))
+        // Refresh to get updated streak
+        setTimeout(() => get().fetchHabits(), 500)
       }
     } else {
       // Complete: upsert a log
@@ -252,15 +257,30 @@ export const useHabitsStore = create((set, get) => ({
     }
   },
 
-  // Save actual_value and/or completion_log for today's log (without toggling completion)
+  // Save actual_value and/or completion_log for today's log (without toggling completion for non-quantifiable)
   saveLog: async (habitId, { actualValue, completionLog }) => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { error: { message: 'Not authenticated' } }
 
     const today = new Date().toISOString().split('T')[0]
+    
+    // Find the habit to check baseline_target
+    const habit = get().habits.find(h => h.id === habitId)
+    if (!habit) return { error: { message: 'Habit not found' } }
 
     const updates = {}
-    if (actualValue !== undefined) updates.actual_value = actualValue === '' ? null : Number(actualValue)
+    if (actualValue !== undefined) {
+      const val = actualValue === '' ? null : Number(actualValue)
+      updates.actual_value = val
+      
+      // Auto-complete if it meets target
+      if (habit.is_quantifiable && val !== null && habit.baseline_target !== null) {
+        updates.completed = val >= habit.baseline_target
+      } else if (habit.is_quantifiable && val === null) {
+        updates.completed = false
+      }
+    }
+    
     if (completionLog !== undefined) updates.completion_log = completionLog || null
 
     const { data, error } = await supabase
@@ -289,6 +309,12 @@ export const useHabitsStore = create((set, get) => ({
           : h
       ),
     }))
+    
+    // Refresh to get updated streak since DB triggers update streak on completed change
+    if (updates.completed !== undefined) {
+      setTimeout(() => get().fetchHabits(), 500)
+    }
+
     return { data, error: null }
   },
 

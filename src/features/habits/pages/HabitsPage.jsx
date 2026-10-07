@@ -6,6 +6,8 @@ export default function HabitsPage() {
   const { habits, categories, loading, fetchHabits, fetchCategories } = useHabitsStore()
   const [showAddModal, setShowAddModal] = useState(false)
   const [editingHabit, setEditingHabit] = useState(null)
+  const [searchQuery, setSearchQuery] = useState("")
+  const [filterCategory, setFilterCategory] = useState("all")
 
   useEffect(() => {
     fetchCategories()
@@ -21,7 +23,7 @@ export default function HabitsPage() {
   }
 
   return (
-    <div>
+    <div className="">
       {/* Header with Add button */}
       <div className="flex items-center justify-between mb-6">
         <div className="font-bubbler text-2xl">My Habits</div>
@@ -34,6 +36,25 @@ export default function HabitsPage() {
         </button>
       </div>
 
+      {/* Filters */}
+      <div className="flex gap-4 mb-6">
+        <input
+          type="text"
+          placeholder="Search habits..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="flex-1 border border-gray-300 rounded-lg px-4 py-2 font-kalam focus:outline-none focus:border-gray-900"
+        />
+        <select
+          value={filterCategory}
+          onChange={(e) => setFilterCategory(e.target.value)}
+          className="border border-gray-300 rounded-lg px-3 py-2 font-kalam focus:outline-none focus:border-gray-900 min-w-[200px]"
+        >
+          <option value="all">All Categories</option>
+          {categories.map(c => <option key={c.id} value={c.id}>{c.display_name}</option>)}
+        </select>
+      </div>
+
       {/* Habits list */}
       {habits.length === 0 ? (
         <div className="font-bubbler text-center py-16 text-gray-400">
@@ -42,14 +63,21 @@ export default function HabitsPage() {
           <div className="text-sm mt-1">Click "Add Habit" to create your first one</div>
         </div>
       ) : (
-        <div className="flex flex-col gap-3">
-          {habits.map((habit) => (
-            <HabitItem
-              key={habit.id}
-              habit={habit}
-              onEdit={() => setEditingHabit(habit)}
-            />
-          ))}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-6">
+          {habits
+            .filter(h => {
+              const matchesSearch = h.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                                    (h.description && h.description.toLowerCase().includes(searchQuery.toLowerCase()))
+              const matchesFilter = filterCategory === 'all' || h.category_id === filterCategory
+              return matchesSearch && matchesFilter
+            })
+            .map((habit) => (
+              <HabitItem
+                key={habit.id}
+                habit={habit}
+                onEdit={() => setEditingHabit(habit)}
+              />
+            ))}
         </div>
       )}
 
@@ -117,166 +145,148 @@ const HabitItem = ({ habit, onEdit }) => {
   }
 
   return (
-    <div className="font-bubbler border rounded">
+    <div 
+      className="font-roboto bg-white border border-gray-100 rounded-2xl p-5 flex flex-col shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group" >
+      {/* Category Color Accent */}
+      {/* <div className="absolute top-0 left-0 w-full h-1.5" style={{ backgroundColor: habit.category?.color_hex || '#e5e7eb' }} /> */}
 
-      {/* Collapsed header — always visible */}
-      <div
-        className="flex items-center justify-between px-4 py-3 cursor-pointer select-none hover:bg-gray-50 transition-colors"
-        onClick={() => setExpanded(!expanded)}
-      >
-        <div className="flex items-center gap-3">
-          <div
-            className="rounded w-5 h-5 shrink-0"
-            style={{ backgroundColor: habit.category?.color_hex || '#FDE047' }}
+      <div className="flex flex-col md:flex-row gap-6 mt-1 items-center md:items-stretch">
+        
+        {/* Left Side: Details */}
+        <div className="flex-1 flex flex-col gap-4 w-full">
+          
+          {/* Line 1: Header (Name + Actions) */}
+          <div className="flex justify-between items-start gap-4">
+            <div 
+              className="font-bold text-2xl leading-tight tracking-tight flex-1"
+              style={{ color: habit.category?.color_hex || '#1f2937' }}
+              title={habit.name}
+            >
+              {habit.name}
+            </div>
+            
+            <div className="flex gap-1.5 shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+              <button onClick={onEdit} className="p-1.5 bg-gray-50 border border-gray-200 rounded-md text-xs text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors">✏️</button>
+              {!confirmDelete ? (
+                <button onClick={() => setConfirmDelete(true)} className="p-1.5 bg-gray-50 border border-gray-200 rounded-md text-xs text-gray-500 hover:text-red-600 hover:bg-red-50 transition-colors">🗑️</button>
+              ) : (
+                <div className="flex gap-1 bg-red-50 border border-red-100 rounded-md p-1 shadow-sm">
+                  <button onClick={handleDelete} disabled={deleting} className="px-2 text-xs text-red-600 font-bold hover:bg-red-100 rounded">Yes</button>
+                  <button onClick={() => setConfirmDelete(false)} className="px-2 text-xs text-gray-600 hover:bg-gray-200 rounded">No</button>
+                </div>
+              )}
+            </div>
+          </div>
+          
+          {/* Line 2: Marking & Target */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mt-auto">
+            <div className="flex items-center gap-3">
+              {habit.is_quantifiable ? (
+                <div className="flex items-center">
+                  <input
+                    type="number"
+                    className="w-16 h-10 border-2 border-gray-200 rounded-l-lg text-lg font-medium text-center focus:outline-none focus:border-gray-800 transition-colors"
+                    placeholder={'0'}
+                    value={actualValue}
+                    onChange={(e) => {
+                      setActualValue(e.target.value)
+                      scheduleSave(e.target.value, completionLog)
+                    }}
+                  />
+                  <div className="h-10 px-3 bg-gray-100 border-y-2 border-r-2 border-gray-200 rounded-r-lg flex items-center text-sm font-medium text-gray-500">
+                    / {habit.baseline_target} {habit.unit}
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center gap-3">
+                  <div
+                    className={`w-10 h-10 rounded-lg shrink-0 flex items-center justify-center cursor-pointer border-2 transition-all duration-200 ${
+                      isCompleted ? 'bg-green-500 border-green-500 text-white shadow-sm shadow-green-200' : 'bg-gray-50 border-gray-300 hover:border-gray-400 hover:bg-gray-100'
+                    }`}
+                    onClick={() => toggleHabitLog(habit.id)}
+                  >
+                    {isCompleted && <span className="text-xl font-sans">✓</span>}
+                  </div>
+                  <div className={`text-sm font-medium ${isCompleted ? 'text-green-600' : 'text-gray-400'}`}>
+                    {isCompleted ? "Active" : "Not Active"}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Line 3: Streaks */}
+          <div className="flex gap-4 text-xs font-medium text-gray-600 shrink-0 bg-gray-50/80 px-3 py-2 rounded-lg border border-gray-100">
+            <span className="flex items-center gap-1.5" title="Current Streak">
+              <span className="text-base">🔥</span> {habit.streak?.current_streak || 0} Current
+            </span>
+            <span className="w-px bg-gray-200" />
+            <span className="flex items-center gap-1.5" title="Best Streak">
+              <span className="text-base">🏆</span> {habit.streak?.longest_streak || 0} Best
+            </span>
+          </div>
+
+        </div>
+
+        {/* Right Side: Monthly Graph */}
+        <div className=" shrink-0 p-3 bg-gray-50 rounded-xl flex flex-col justify-center items-center border border-gray-100">
+          <StreakGraph 
+            habitId={habit.id} 
+            currentMonthOnly={true} 
+            hideStats={true} 
+            refreshTrigger={`${habit.todayLog?.completed}-${habit.todayLog?.actual_value}`} 
           />
-          <div className="font-bold text-xl">{habit.name}</div>
         </div>
 
-        <div className="flex items-center gap-4">
-          {/* Streak badge */}
-          <div className="text-sm text-gray-500">
-            🔥 {habit.streak?.current_streak || 0}
-          </div>
-
-          {/* Completion toggle */}
-          <div
-            className={`text-sm px-2 py-0.5 rounded cursor-pointer select-none transition-colors ${
-              isCompleted
-                ? 'bg-green-100 text-green-700'
-                : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-            }`}
-            onClick={(e) => { e.stopPropagation(); toggleHabitLog(habit.id) }}
-          >
-            {isCompleted ? '✓ Done' : 'Mark done'}
-          </div>
-
-          {/* Chevron */}
-          <div className={`text-gray-400 transition-transform ${expanded ? 'rotate-180' : ''}`}>
-            ▼
-          </div>
-        </div>
       </div>
 
-      {/* Expanded details */}
+      {/* View Full Details Toggle */}
+      {/* <div 
+        className="mt-5 text-center text-[10px] font-bold text-gray-400 cursor-pointer hover:text-gray-600 uppercase tracking-widest font-sans bg-gray-50 py-2 rounded-lg border border-transparent hover:border-gray-200 transition-colors"
+        onClick={() => setExpanded(!expanded)}
+      >
+        {expanded ? "▲ Hide Details" : "▼ View Full Details"}
+      </div> */}
+
+      {/* Expanded Area: Full details */}
       {expanded && (
-        <div className="px-4 pb-4 pt-1 border-t flex flex-col gap-4">
-
-          {/* Info row */}
-          <div className="flex flex-col gap-1">
-            <div className="flex justify-between items-start">
-              <div className="flex gap-4 items-center flex-wrap">
-                <div className="border rounded px-2 py-1 text-sm"
-                  style={{
-                    borderColor: habit.category?.color_hex || '#e5e7eb',
-                    color: habit.category?.color_hex || '#6b7280',
-                  }}
-                >
-                  {habit.category?.icon} {habit.category?.display_name || 'Uncategorized'}
-                </div>
-                {habit.is_quantifiable && (
-                  <div className="border rounded px-2 py-1 text-sm">
-                    {habit.baseline_target} {habit.unit}
-                  </div>
-                )}
-                <div className="border rounded px-2 py-1 text-xs text-gray-500">
-                  {habit.frequency}
-                </div>
+        <div className="mt-4 border-t pt-4">
+          
+          <div className="flex flex-col gap-6">
+            
+            {/* Reflection Input */}
+            <div className="flex-1">
+              <div className="flex justify-between items-center mb-1.5">
+                <label className="text-[10px] text-gray-500 font-bold uppercase tracking-widest font-sans">Today's Reflection</label>
+                {saving && <span className="text-[10px] text-gray-400 font-sans italic">Saving…</span>}
               </div>
-
-              {/* Edit / Delete buttons */}
-              <div className="flex gap-2 shrink-0">
-                <button
-                  onClick={onEdit}
-                  className="text-xs px-2 py-1 border rounded text-gray-500 hover:text-gray-900 hover:border-gray-400 transition-colors"
-                >
-                  Edit
-                </button>
-                {!confirmDelete ? (
-                  <button
-                    onClick={() => setConfirmDelete(true)}
-                    className="text-xs px-2 py-1 border rounded text-gray-500 hover:text-red-600 hover:border-red-300 transition-colors"
-                  >
-                    Delete
-                  </button>
-                ) : (
-                  <div className="flex gap-1">
-                    <button
-                      onClick={handleDelete}
-                      disabled={deleting}
-                      className="text-xs px-2 py-1 bg-red-600 text-white rounded disabled:opacity-50"
-                    >
-                      {deleting ? '...' : 'Confirm'}
-                    </button>
-                    <button
-                      onClick={() => setConfirmDelete(false)}
-                      className="text-xs px-2 py-1 border rounded text-gray-500"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {habit.description && (
-              <div className="text-gray-600 mt-1">{habit.description}</div>
-            )}
-
-            {/* Streak summary */}
-            <div className="flex gap-6 text-sm text-gray-500 mt-1">
-              <span>🔥 {habit.streak?.current_streak || 0} day streak</span>
-              <span>🏆 Best: {habit.streak?.longest_streak || 0} days</span>
-            </div>
-          </div>
-
-          {/* Streak graph */}
-          <div>
-            <StreakGraph habitId={habit.id} />
-          </div>
-
-          {/* ── Today's Log ── */}
-          <div className="border-t pt-4 flex flex-col gap-3">
-            <div className="flex items-center justify-between">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Today's log</p>
-              {saving && <span className="text-xs text-gray-400">Saving…</span>}
-            </div>
-
-            {/* actual_value — only for quantifiable habits */}
-            {habit.is_quantifiable && (
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">
-                  Actual {habit.unit ? `(${habit.unit})` : 'value'}
-                  <span className="ml-1 text-gray-300">· target: {habit.baseline_target}</span>
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="any"
-                  placeholder={`e.g. ${habit.baseline_target}`}
-                  value={actualValue}
-                  onChange={(e) => {
-                    setActualValue(e.target.value)
-                    scheduleSave(e.target.value, completionLog)
-                  }}
-                  className="w-32 border border-gray-200 rounded-lg px-3 py-1.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition"
-                />
-              </div>
-            )}
-
-            {/* completion_log — reflection text */}
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">How did it feel?</label>
               <textarea
-                rows={2}
-                placeholder="Write a quick reflection…"
+                placeholder="How did it feel today? Write a short reflection..."
+                rows={3}
                 value={completionLog}
                 onChange={(e) => {
                   setCompletionLog(e.target.value)
                   scheduleSave(actualValue, e.target.value)
                 }}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition resize-none"
+                className="w-full text-sm border-2 border-gray-100 bg-gray-50 rounded-xl px-4 py-3 focus:outline-none focus:border-gray-300 focus:bg-white transition-colors resize-none"
               />
             </div>
+            
+            {/* Yearly Graph */}
+            <div className="mb-2">
+              <div className="text-[10px] text-gray-500 font-bold uppercase tracking-widest font-sans mb-3">Yearly Overview</div>
+              <div className="overflow-x-auto pb-4 w-full flex justify-start custom-scrollbar">
+                <div className="min-w-fit pr-4">
+                  <StreakGraph 
+                    habitId={habit.id} 
+                    currentMonthOnly={false} 
+                    hideStats={true} 
+                    refreshTrigger={`${habit.todayLog?.completed}-${habit.todayLog?.actual_value}`} 
+                  />
+                </div>
+              </div>
+            </div>
+
           </div>
         </div>
       )}

@@ -2,7 +2,7 @@ import { useMemo, useEffect, useState } from "react";
 import { supabase } from "../../core/lib/supabase";
 
 
-const StreakGraph = ({ habitId, overall }) => {
+const StreakGraph = ({ habitId, overall, currentMonthOnly, hideStats, refreshTrigger }) => {
 
     const [logDates, setLogDates] = useState(new Set());
     const [allCompleteDates, setAllCompleteDates] = useState(new Set());
@@ -82,17 +82,36 @@ const StreakGraph = ({ habitId, overall }) => {
         };
 
         fetchLogs();
-    }, [habitId, overall]);
+    }, [habitId, overall, refreshTrigger]);
 
     const streakGraphData = useMemo(
         () => {
             const today = new Date();
+            if (currentMonthOnly) {
+                const year = today.getFullYear();
+                const month = today.getMonth();
+                const firstDay = new Date(year, month, 1);
+                const lastDay = new Date(year, month + 1, 0);
+                
+                let days = [];
+                let paddingDays = firstDay.getDay(); 
+                for (let i = 0; i < paddingDays; i++) {
+                    days.push(null);
+                }
+                
+                for (let i = 1; i <= lastDay.getDate(); i++) {
+                    days.push(new Date(year, month, i));
+                }
+                
+                return days;
+            }
+
             const startDay = new Date();
             startDay.setDate(today.getDate() - 365);
             let days = [];
-
-            let paddingDays = today.getDay() % 6;
-            for (let i = 1; i < paddingDays; i++) {
+            
+            let paddingDays = startDay.getDay();
+            for (let i = 0; i < paddingDays; i++) {
                 days.push(null);
             }
 
@@ -132,16 +151,17 @@ const StreakGraph = ({ habitId, overall }) => {
     const isDataMode = habitId || overall;
 
     return (
-        <div className="p-5 border rounded w-fit">
+        <div className={hideStats ? "" : "p-5 border rounded w-fit"}>
 
             {/* Streak information */}
-            <div className="flex gap-10 mb-7 font-kalam">
-                <div className="flex items-center gap-3">
-                    <div className="text-sm font-light">
-                        {overall ? 'All habits complete' : 'Total active days'}
+            {!hideStats && (
+                <div className="flex gap-10 mb-7 font-kalam">
+                    <div className="flex items-center gap-3">
+                        <div className="text-sm font-light">
+                            {overall ? 'All habits complete' : 'Total active days'}
+                        </div>
+                        <div className="text-sm"> {isDataMode ? streakInfo.totalActive : '—'} </div>
                     </div>
-                    <div className="text-sm"> {isDataMode ? streakInfo.totalActive : '—'} </div>
-                </div>
                 <div className="flex items-center gap-3">
                     <div className="text-sm font-light"> Max streak </div>
                     <div className="text-sm"> {isDataMode ? streakInfo.maxStreak : '—'} </div>
@@ -152,25 +172,35 @@ const StreakGraph = ({ habitId, overall }) => {
                         <span className="inline-block w-3 h-3 bg-green-200 rounded-sm ml-2" /> Partial
                     </div>
                 )}
-            </div>
+                </div>
+            )}
 
-            {/* Streak Graph */}
-            <div className="grid grid-rows-7 grid-flow-col gap-[1.5px] w-fit ">
-                {
-                    streakGraphData.map(
-                        (date, index) =>
-                        (
+            {currentMonthOnly ? (
+                <div className="flex flex-col items-center">
+                    <div className="font-bold text-sm text-gray-700 font-sans">{new Date().toLocaleString('default', { month: 'long' })}</div>
+                    <div className="text-xs text-gray-500 mb-2 font-sans">
+                        {streakGraphData.filter(d => d && logDates.has(d.toISOString().split('T')[0])).length} days completed
+                    </div>
+                    <div className="grid grid-cols-7 gap-1 w-fit">
+                        {streakGraphData.map((date, index) => (
                             date == null ?
-                                (<div key={index} className="w-3 h-3" />)
-                                :
-                                (<div key={index} className={`w-3 h-3 ${getColor(date)}`}
-                                    title={date.toDateString()}
-                                />)
-                        )
-                    )
-                }
-            </div>
-
+                                <div key={index} className="w-3.5 h-3.5" /> :
+                                <div key={index} className={`w-3.5 h-3.5 rounded-sm ${getColor(date)}`} title={date.toDateString()} />
+                        ))}
+                    </div>
+                </div>
+            ) : (
+                <div className="grid grid-rows-7 grid-flow-col gap-[1.5px] w-fit ">
+                    {streakGraphData.map((date, index) => (
+                        date == null ?
+                            (<div key={index} className="w-3 h-3" />)
+                            :
+                            (<div key={index} className={`w-3 h-3 ${getColor(date)}`}
+                                title={date.toDateString()}
+                            />)
+                    ))}
+                </div>
+            )}
         </div>
     );
 };
