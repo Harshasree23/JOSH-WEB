@@ -8,6 +8,7 @@ const navItems = [
   { to: '/habits', label: 'Habits' },
   { to: '/money', label: '💰 Money' },
   { to: '/projects', label: 'Projects' },
+  { to: '/goals', label: 'Goals' },
   { to: '/settings', label: 'Settings' },
 ]
 

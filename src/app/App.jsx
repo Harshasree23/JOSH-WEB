@@ -9,6 +9,7 @@ import { SettingsPage } from '../features/settings'
 import { BoardPage } from '../features/board'
 import { MoneyPage } from '../features/money'
 import { ProjectsPage } from '../features/projects'
+import { GoalsPage } from '../features/goals'
 
 export default function App() {
   return (
@@ -23,6 +24,7 @@ export default function App() {
             <Route path="habits" element={<HabitsPage />} />
             <Route path="money" element={<MoneyPage />} />
             <Route path="projects" element={<ProjectsPage />} />
+            <Route path="goals" element={<GoalsPage />} />
             <Route path="settings" element={<SettingsPage />} />
           </Route>
         </Routes>

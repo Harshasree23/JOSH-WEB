@@ -4,6 +4,7 @@ import StreakGraph from "../../../shared/components/StreakGraph";
 import { useHabitsStore } from "../../habits/stores/habitsStore";
 import { useBoardStore } from "../../board/stores/boardStore";
 import { useAuthStore } from "../../auth/stores/authStore";
+import { useGoalsStore } from "../../goals/stores/goalsStore";
 
 export default function DashboardPage() 
 {
@@ -12,11 +13,14 @@ export default function DashboardPage()
   const { profile } = useAuthStore();
   const boardSummary = useBoardStore((s) => s.getSummary);
 
+  const { goals, fetchGoals } = useGoalsStore();
+  
   useEffect(() => {
     fetchCategories();
     fetchHabits();
     fetchEvents(new Date());
-  }, [fetchCategories, fetchHabits, fetchEvents]);
+    fetchGoals();
+  }, [fetchCategories, fetchHabits, fetchEvents, fetchGoals]);
 
   const completedCount = habits.filter(h => h.todayLog?.completed).length;
   const totalCount = habits.length;
@@ -152,7 +156,57 @@ export default function DashboardPage()
           </div>
       </div>
 
-    </div>
+      </div>
+
+      {/* Active Goals */}
+      <Heading title="Active Goals" />
+      <div className="flex gap-6 mb-10 overflow-x-auto pb-4">
+        {goals.length === 0 ? (
+          <div className="font-bubbler text-gray-400 text-sm italic">No active goals.</div>
+        ) : (
+          goals.map(goal => {
+            let progressDays = 0;
+            let totalDays = 0;
+            let progressPercent = 0;
+            
+            if (goal.time_period_start && goal.time_period_end) {
+              const start = new Date(goal.time_period_start);
+              const end = new Date(goal.time_period_end);
+              const now = new Date();
+              
+              totalDays = Math.max(1, Math.ceil((end - start) / (1000 * 60 * 60 * 24)));
+              progressDays = Math.max(0, Math.ceil((now - start) / (1000 * 60 * 60 * 24)));
+              if (progressDays > totalDays) progressDays = totalDays;
+              
+              progressPercent = (progressDays / totalDays) * 100;
+            }
+
+            return (
+              <div key={goal.id} className="min-w-[250px] border rounded-lg p-4 flex flex-col gap-2">
+                <div className="font-bubbler text-xl font-bold">{goal.name}</div>
+                
+                {goal.time_period_start && goal.time_period_end && (
+                  <div>
+                    <div className="flex justify-between text-xs text-gray-500 mb-1">
+                      <span>{progressDays} / {totalDays} days</span>
+                      <span>{Math.round(progressPercent)}%</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div className="bg-blue-500 h-2 rounded-full" style={{ width: `${progressPercent}%` }}></div>
+                    </div>
+                  </div>
+                )}
+                
+                {goal.target_value && (
+                  <div className="text-sm text-blue-600 font-kalam mt-1">
+                    🎯 Target: {goal.target_value} {goal.target_unit}
+                  </div>
+                )}
+              </div>
+            )
+          })
+        )}
+      </div>
 
       {/* Overall Activity Heatmap */}
       <Heading title="Activity" />
