@@ -7,7 +7,7 @@ const navItems = [
   { to: '/board', label: 'Board' },
   { to: '/habits', label: 'Habits' },
   { to: '/money', label: '💰 Money' },
-  { to: '/projects', label: 'Projects' },
+  { to: '/projects', label: 'Learning & Projects' },
   { to: '/goals', label: 'Goals' },
   { to: '/settings', label: 'Settings' },
 ]

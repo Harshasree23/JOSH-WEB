@@ -34,7 +34,7 @@ export const useProjectsStore = create((set, get) => ({
     }
   },
 
-  addProject: async ({ name, description }) => {
+  addProject: async ({ name, description, projectType }) => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { error: { message: 'Not authenticated' } }
 
@@ -44,6 +44,7 @@ export const useProjectsStore = create((set, get) => ({
         user_id: user.id,
         name,
         description: description || null,
+        project_type: projectType || 'project',
         status: 'active'
       })
       .select()
@@ -97,7 +98,7 @@ export const useProjectsStore = create((set, get) => ({
     return { error: null }
   },
 
-  addTask: async ({ projectId, parentTaskId, title, description }) => {
+  addTask: async ({ projectId, parentTaskId, title, description, linkedProjectId }) => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { error: { message: 'Not authenticated' } }
 
@@ -109,6 +110,7 @@ export const useProjectsStore = create((set, get) => ({
         parent_task_id: parentTaskId || null,
         title,
         description: description || null,
+        linked_project_id: linkedProjectId || null,
       })
       .select()
       .single()
