@@ -149,9 +149,12 @@ export const useProjectsStore = create((set, get) => ({
     const task = get().tasks.find((t) => t.id === taskId)
     if (!task) return
 
+    const isCompleted = !task.is_completed;
+    const completedAt = isCompleted ? new Date().toISOString() : null;
+
     const { data, error } = await supabase
       .from('tasks')
-      .update({ is_completed: !task.is_completed })
+      .update({ is_completed: isCompleted, completed_at: completedAt })
       .eq('id', taskId)
       .select()
       .single()
@@ -159,7 +162,7 @@ export const useProjectsStore = create((set, get) => ({
     if (!error) {
       set((state) => ({
         tasks: state.tasks.map((t) =>
-          t.id === taskId ? { ...t, is_completed: data.is_completed } : t
+          t.id === taskId ? { ...t, is_completed: data.is_completed, completed_at: data.completed_at } : t
         ),
       }))
     }

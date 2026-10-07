@@ -14,7 +14,7 @@ export default function DashboardPage()
   const { profile } = useAuthStore();
   const boardSummary = useBoardStore((s) => s.getSummary);
 
-  const { goals, fetchGoals } = useGoalsStore();
+  const { goals, fetchGoals, goalProgress } = useGoalsStore();
   const { projects, tasks, fetchProjects } = useProjectsStore();
   
   useEffect(() => {
@@ -168,30 +168,28 @@ export default function DashboardPage()
           <div className="font-bubbler text-gray-400 text-sm italic">No active goals.</div>
         ) : (
           goals.map(goal => {
-            let progressDays = 0;
-            let totalDays = 0;
+            let progressDays = goalProgress[goal.id] || 0;
+            let totalDays = parseInt(goal.target_value) || 0;
             let progressPercent = 0;
             
-            if (goal.time_period_start && goal.time_period_end) {
+            if (!totalDays && goal.time_period_start && goal.time_period_end) {
               const start = new Date(goal.time_period_start);
               const end = new Date(goal.time_period_end);
-              const now = new Date();
-              
               totalDays = Math.max(1, Math.ceil((end - start) / (1000 * 60 * 60 * 24)));
-              progressDays = Math.max(0, Math.ceil((now - start) / (1000 * 60 * 60 * 24)));
-              if (progressDays > totalDays) progressDays = totalDays;
-              
-              progressPercent = (progressDays / totalDays) * 100;
+            }
+
+            if (totalDays > 0) {
+              progressPercent = Math.min(100, (progressDays / totalDays) * 100);
             }
 
             return (
               <div key={goal.id} className="min-w-[250px] border rounded-lg p-4 flex flex-col gap-2">
                 <div className="font-bubbler text-xl font-bold">{goal.name}</div>
                 
-                {goal.time_period_start && goal.time_period_end && (
+                {totalDays > 0 && (
                   <div>
                     <div className="flex justify-between text-xs text-gray-500 mb-1">
-                      <span>{progressDays} / {totalDays} days</span>
+                      <span>{progressDays} / {totalDays} {goal.target_unit || 'days'}</span>
                       <span>{Math.round(progressPercent)}%</span>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-2">
@@ -200,9 +198,9 @@ export default function DashboardPage()
                   </div>
                 )}
                 
-                {goal.target_value && (
+                {!goal.target_value && goal.time_period_end && (
                   <div className="text-sm text-blue-600 font-kalam mt-1">
-                    🎯 Target: {goal.target_value} {goal.target_unit}
+                    Ends: {new Date(goal.time_period_end).toLocaleDateString()}
                   </div>
                 )}
               </div>

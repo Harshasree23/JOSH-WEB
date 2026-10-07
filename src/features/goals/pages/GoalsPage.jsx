@@ -8,7 +8,7 @@ export default function GoalsPage() {
     goals, goalHabits, goalProjects, goalTasks, 
     loading, fetchGoals, addGoal, deleteGoal, 
     linkHabit, unlinkHabit, linkProject, unlinkProject,
-    addTask, toggleTaskCompletion, deleteTask
+    addTask, toggleTaskCompletion, deleteTask, goalProgress
   } = useGoalsStore()
   
   const { habits, fetchHabits } = useHabitsStore()
@@ -49,20 +49,18 @@ export default function GoalsPage() {
             <div className="text-gray-400 text-sm font-bubbler mt-4">No goals yet.</div>
           ) : (
             goals.map(goal => {
-              let progressDays = 0;
-              let totalDays = 0;
+              let progressDays = goalProgress[goal.id] || 0;
+              let totalDays = parseInt(goal.target_value) || 0;
               let progressPercent = 0;
               
-              if (goal.time_period_start && goal.time_period_end) {
+              if (!totalDays && goal.time_period_start && goal.time_period_end) {
                 const start = new Date(goal.time_period_start);
                 const end = new Date(goal.time_period_end);
-                const now = new Date();
-                
                 totalDays = Math.max(1, Math.ceil((end - start) / (1000 * 60 * 60 * 24)));
-                progressDays = Math.max(0, Math.ceil((now - start) / (1000 * 60 * 60 * 24)));
-                if (progressDays > totalDays) progressDays = totalDays;
-                
-                progressPercent = (progressDays / totalDays) * 100;
+              }
+
+              if (totalDays > 0) {
+                progressPercent = Math.min(100, (progressDays / totalDays) * 100);
               }
 
               return (
@@ -91,10 +89,10 @@ export default function GoalsPage() {
                     </div>
                   </div>
                   
-                  {goal.time_period_start && goal.time_period_end && (
+                  {totalDays > 0 && (
                     <div className="mt-1">
                       <div className="flex justify-between text-xs text-gray-500 mb-1">
-                        <span>{progressDays} / {totalDays} days</span>
+                        <span>{progressDays} / {totalDays} {goal.target_unit || 'days'}</span>
                         <span>{Math.round(progressPercent)}%</span>
                       </div>
                       <div className="w-full bg-gray-200 rounded-full h-1.5">
@@ -103,9 +101,9 @@ export default function GoalsPage() {
                     </div>
                   )}
 
-                  {goal.target_value && (
-                    <div className="text-xs text-blue-500 font-bold mt-1">
-                      Target: {goal.target_value} {goal.target_unit}
+                  {!goal.target_value && goal.time_period_end && (
+                    <div className="text-xs text-gray-400 mt-1">
+                      Ends: {new Date(goal.time_period_end).toLocaleDateString()}
                     </div>
                   )}
                 </div>
